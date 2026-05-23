@@ -33,6 +33,96 @@ $AgyExtensions = @(
     "antigravity-remote-wsl"
 )
 
+function Get-AiUiCompatManifest {
+    $compatPath = Join-Path $ProjectRoot "patches\ai-ui-compat.json"
+    if (-not (Test-Path $compatPath)) {
+        return $null
+    }
+    return Get-Content $compatPath -Raw -Encoding UTF8 | ConvertFrom-Json
+}
+
+function Test-BundleHashMatch {
+    param(
+        [string]$AppVersion,
+        [string]$SourcePath
+    )
+
+    if (-not (Test-Path $SourcePath)) {
+        return $false
+    }
+
+    $compat = Get-AiUiCompatManifest
+    if (-not $compat) {
+        return $false
+    }
+
+    $sourceHash = Get-Sha256OrNull $SourcePath
+    return $null -ne ($compat.supportedBundles | Where-Object {
+        $_.antigravityVersion -eq $AppVersion -and
+        $_.sourceSha256.ToUpperInvariant() -eq $sourceHash
+    } | Select-Object -First 1)
+}
+
+function Get-LatestAntigravityPortFromLog {
+    $mainLog = Join-Path $env:APPDATA "Antigravity\logs\main.log"
+    if (-not (Test-Path $mainLog)) {
+        return $null
+    }
+
+    $match = Select-String -Path $mainLog -Pattern 'Local:\s+https://127\.0\.0\.1:(\d+)/' | Select-Object -Last 1
+    if (-not $match) {
+        return $null
+    }
+
+    return $match.Matches[0].Groups[1].Value
+}
+
+function Save-LiveUiMainBundle {
+    param(
+        [string]$Port,
+        [string]$OutputPath
+    )
+
+    if (-not $Port) {
+        return $false
+    }
+
+    $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
+    if (-not $curl) {
+        return $false
+    }
+
+    & $curl.Path -k "https://127.0.0.1:$Port/main.js" -o $OutputPath | Out-Null
+    return (Test-Path $OutputPath) -and ((Get-Item $OutputPath).Length -gt 0)
+}
+
+function Resolve-UiMainSource {
+    param([string]$RequestedPath)
+
+    $appVersion = Get-AntigravityVersion $AntigravityPath
+    $cachePath = Join-Path $env:LOCALAPPDATA "Temp\agy_ui_main_$($appVersion -replace '[^0-9A-Za-z._-]', '_').js"
+
+    if ((Test-Path $RequestedPath) -and (Test-BundleHashMatch -AppVersion $appVersion -SourcePath $RequestedPath)) {
+        return $RequestedPath
+    }
+
+    if ((Test-Path $cachePath) -and (Test-BundleHashMatch -AppVersion $appVersion -SourcePath $cachePath)) {
+        return $cachePath
+    }
+
+    $processes = Get-Process -Name "Antigravity" -ErrorAction SilentlyContinue
+    if ($processes) {
+        $port = Get-LatestAntigravityPortFromLog
+        if ((Save-LiveUiMainBundle -Port $port -OutputPath $cachePath) -and
+            (Test-BundleHashMatch -AppVersion $appVersion -SourcePath $cachePath)) {
+            Write-Host "  Resolved UI bundle from running Antigravity session" -ForegroundColor Green
+            return $cachePath
+        }
+    }
+
+    return $RequestedPath
+}
+
 function Get-Sha256OrNull {
     param([string]$Path)
     if (Test-Path $Path) {
@@ -123,6 +213,18 @@ function Set-CustomSchemeMode {
     $customSchemeTarget = Join-Path $extractedPath "dist\customScheme.js"
     $patchPath = Join-Path $ProjectRoot "patches\customScheme.$Mode.js"
 
+    if (-not (Test-Path $extractedPath)) {
+        if (-not (Test-Path "$asarPath.bak")) {
+            Copy-Item $asarPath "$asarPath.bak" -Force
+            Write-Host "  Created backup of app.asar" -ForegroundColor Green
+        }
+        Write-Host "  Extracting app.asar..." -ForegroundColor White
+        npx asar extract $asarPath $extractedPath
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $extractedPath)) {
+            throw "Failed to extract app.asar."
+        }
+    }
+
     if (Test-Path $extractedPath) {
         if (-not (Test-Path "$asarPath.bak")) {
             Copy-Item $asarPath "$asarPath.bak" -Force
@@ -152,7 +254,7 @@ function Set-CustomSchemeMode {
 function Test-AiUiCompatibility {
     $appVersion = Get-AntigravityVersion $AntigravityPath
     $sourceHash = Get-Sha256OrNull $UiMainSource
-    $compatPath = Join-Path $ProjectRoot "patches\ai-ui-compat.json"
+    $compat = Get-AiUiCompatManifest
 
     if (-not (Test-Path $UiMainSource)) {
         return @{
@@ -163,7 +265,7 @@ function Test-AiUiCompatibility {
         }
     }
 
-    if (-not (Test-Path $compatPath)) {
+    if (-not $compat) {
         return @{
             compatible = $false
             reason = "AI UI compatibility manifest not found"
@@ -171,8 +273,6 @@ function Test-AiUiCompatibility {
             sourceHash = $sourceHash
         }
     }
-
-    $compat = Get-Content $compatPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $match = $compat.supportedBundles | Where-Object {
         $_.antigravityVersion -eq $appVersion -and
         $_.sourceSha256.ToUpperInvariant() -eq $sourceHash
@@ -197,6 +297,10 @@ function Test-AiUiCompatibility {
 
 function Apply-CoreTranslations {
     $appOut = Join-Path $AntigravityPath "resources\app\out"
+    if (-not (Test-Path $appOut)) {
+        Write-Host "  Skipping core NLS translations (not applicable for this version layout; handled by pre-installed language pack)." -ForegroundColor Yellow
+        return
+    }
 
     Write-Host "  Applying VS Code core NLS translations..." -ForegroundColor White
     if (-not (Test-Path "$appOut\nls.messages.json.bak")) {
@@ -234,9 +338,9 @@ function Apply-CoreTranslations {
 
 Write-Host "=== Antigravity Chinese Localization Tool ===" -ForegroundColor Cyan
 
-$appOut = Join-Path $AntigravityPath "resources\app\out"
-if (-not (Test-Path "$appOut\nls.messages.json")) {
-    Write-Error "Antigravity installation not found at: $AntigravityPath"
+$asarPath = Join-Path $AntigravityPath "resources\app.asar"
+if (-not (Test-Path $asarPath)) {
+    Write-Error "Antigravity installation or app.asar not found at: $AntigravityPath"
     exit 1
 }
 
@@ -250,6 +354,13 @@ if ($Restore) {
         Write-Host "  Restored app.asar" -ForegroundColor Green
     }
 
+    $extractedPath = Join-Path $AntigravityPath "resources\extracted_asar"
+    if (Test-Path $extractedPath) {
+        Remove-Item $extractedPath -Recurse -Force
+        Write-Host "  Cleaned up extracted_asar directory" -ForegroundColor Green
+    }
+
+    $appOut = Join-Path $AntigravityPath "resources\app\out"
     $backupFile = "$appOut\nls.messages.json.bak"
     if (Test-Path $backupFile) {
         Copy-Item $backupFile "$appOut\nls.messages.json" -Force
@@ -263,11 +374,13 @@ if ($Restore) {
     }
 
     $extDir = Join-Path $AntigravityPath "resources\app\extensions"
-    foreach ($ext in $AgyExtensions) {
-        $pkgPath = Join-Path $extDir "$ext\package.json"
-        if (Test-Path "$pkgPath.bak") {
-            Copy-Item "$pkgPath.bak" $pkgPath -Force
-            Write-Host "  Restored $ext/package.json" -ForegroundColor Green
+    if (Test-Path $extDir) {
+        foreach ($ext in $AgyExtensions) {
+            $pkgPath = Join-Path $extDir "$ext\package.json"
+            if (Test-Path "$pkgPath.bak") {
+                Copy-Item "$pkgPath.bak" $pkgPath -Force
+                Write-Host "  Restored $ext/package.json" -ForegroundColor Green
+            }
         }
     }
 
@@ -284,6 +397,8 @@ if ($Restore) {
 
 Write-Host "`n[Install] Applying Chinese localization..." -ForegroundColor Yellow
 Write-Host "  Antigravity version: $(Get-AntigravityVersion $AntigravityPath)" -ForegroundColor White
+$UiMainSource = Resolve-UiMainSource -RequestedPath $UiMainSource
+Write-Host "  UI source bundle: $UiMainSource" -ForegroundColor White
 Stop-OrFailIfRunning
 
 $installMode = "stable-core"

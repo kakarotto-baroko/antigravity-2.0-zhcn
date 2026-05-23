@@ -2,11 +2,13 @@
 
 ## 当前结论
 
-- `2.0.0` 上的“进入界面卡死”问题已经定位并修复。
+- 当前主版本已升级到 `2.0.6`。
+- `2.0.0` 上的“进入界面卡死”问题已经定位并修复，修复策略已沿用到后续版本。
 - 修复方案不是全局劫持 `https`，而是：
   `customScheme.ai-ui.js` 注册 `agy-ui://`，再用 `webRequest.onBeforeRequest` 仅重定向 `https://127.0.0.1:*/main.js`。
 - 本机验证过主日志出现 `Serving translated AI UI bundle`，说明主界面中文 bundle 已实际加载。
 - `scripts/translate_ui.py` 已扩展到 289 条 UI 文案映射，本机最新一轮重生成命中 251 条。
+- `scripts/apply.ps1` 现已能在 `2.0.6` 下自动解析真实运行中的 `/main.js`，不再死依赖旧 `scratch\\ui_main.js`。
 
 ## 本次已完成
 
@@ -20,7 +22,7 @@
   `启用遥测 / 营销邮件 / 升级 / 退出登录 / 服务条款 / 通知设置 / 打开系统设置`
 - 快捷键页主要固定文案已补齐：
   `CONVERSATION / LAYOUT CONTROLS / Toggle Model Selector / Toggle Voice Recording / Find in Pane / Toggle Sidebar / Toggle Auxiliary Pane`
-- 本机自动更新到 `2.0.1` 后，已手动把 `customScheme.ai-ui.js` 重新打进当前 `app.asar`，恢复中文主界面加载。
+- `2.0.6` 当前已通过标准命令重新部署验证，主日志可见 `Serving translated AI UI bundle`。
 
 ## 当前仓库里最重要的文件
 
@@ -31,20 +33,18 @@
 - [patches/customScheme.core.js](/G:/GEMINI-xiangmu/AGY/AGY-汉化/patches/customScheme.core.js)
   稳定核心模式模板。
 - [scripts/apply.ps1](/G:/GEMINI-xiangmu/AGY/AGY-汉化/scripts/apply.ps1)
-  现有安装器入口，`2.0.1` 结构下需要继续适配。
+  现有安装器入口，现已对 `2.0.6` 做自动 UI bundle 解析兼容。
 - [scripts/extract.ps1](/G:/GEMINI-xiangmu/AGY/AGY-汉化/scripts/extract.ps1)
   版本更新报告入口。
 - [patches/ai-ui-compat.json](/G:/GEMINI-xiangmu/AGY/AGY-汉化/patches/ai-ui-compat.json)
-  当前只登记了 `2.0.0`。
+  当前已登记 `2.0.0` 与 `2.0.6`。
+- [implementation_plan.md](/G:/GEMINI-xiangmu/AGY/AGY-汉化/implementation_plan.md)
+  当前 `2.0.6` 的最新实施状态、哈希、部署方式与注意事项。
 
 ## 待继续处理
 
-- 适配 `2.0.1` 的一键安装流程。
-  当前 `scripts/apply.ps1` 用 `resources/app/out/nls.messages.json` 判断安装存在性，在 `2.0.1` 上会误报未安装。
-- 重新设计 `2.0.1` 的核心汉化应用路径。
-  当前安装目录只剩 `resources/app.asar`、`resources/app.asar.unpacked`、`resources/bin`，旧版 `resources/app/out` 结构已消失。
-- 更新 `patches/ai-ui-compat.json`。
-  需要补 `2.0.1` 的正式兼容记录，而不是只靠本机手动回灌补丁。
+- 继续观察后续高版本更新后的目录结构变化。
+- 若官方继续升级，需要重新抓取真实 `/main.js` 并更新 `patches/ai-ui-compat.json`。
 - 做第二轮 AI UI 扫描。
   目前设置中心主体已补一轮，但仍可能残留分组标题、提示文本、通知页、Editor / Tab / Browser 深层描述中的英文。
 - 继续处理运行态拼接文本。
@@ -59,9 +59,8 @@
 ## 建议下一步
 
 1. 先提交这批代码和文档，让仓库状态可追踪。
-2. 新开一轮 `2.0.1` 结构适配：
-   目标是恢复 `scripts/apply.ps1` 在 `2.0.1` 下的可用性。
-3. 提取 `2.0.1` 的真实前端 bundle 指纹，更新 `patches/ai-ui-compat.json`。
+2. 后续若官方升级版本，先提取新版本真实前端 bundle 指纹，更新 `patches/ai-ui-compat.json`。
+3. 继续逐屏复查静态说明文案，但不要碰动态数据字段。
 4. 用运行中的设置页逐屏复查，把残余英文继续补掉。
 
 ## 建议上传内容
@@ -85,11 +84,11 @@
 - `%APPDATA%\\Antigravity\\zh_cn_ui_main.js` 已通过 `node --check`。
 - 最新一轮 `scripts/translate_ui.py` 命中 251 / 289。
 - `scripts/validate.ps1` 通过：16,567 条消息，已翻译 16,352 条，覆盖率 98.7%。
-- `2.0.1` 当前主日志再次出现：
+- `2.0.6` 当前主日志再次出现：
   `Serving translated AI UI bundle: C:\\Users\\Administrator\\AppData\\Roaming\\Antigravity\\zh_cn_ui_main.js`
 
 ## 注意事项
 
-- 不要假设 `2.0.0` 和 `2.0.1` 的目录结构相同。
-- 不要直接依赖旧的 `resources/extracted_asar` 目录；`2.0.1` 更新后它已经不存在。
+- 不要假设 `2.0.0`、`2.0.1`、`2.0.6` 的目录结构相同。
+- 不要再假设旧的 `resources/app/out` 一定存在。
 - 本机的自动更新在退出时会触发静默升级，可能覆盖已打入的补丁。

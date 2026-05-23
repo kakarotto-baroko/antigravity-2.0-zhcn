@@ -26,3 +26,14 @@
 ### 已知问题
 - `scripts/apply.ps1` 仍按 `2.0.0` 目录结构判断安装存在性，遇到 `2.0.1` 会误报未安装。
 - `2.0.1` 的核心 NLS / product / extension 自动应用流程还没有完成适配。
+
+## [0.3.0] - 2026-05-23
+
+### 修复
+- 将 `scripts/apply.ps1` 更新为兼容 `Antigravity 2.0.6` 的部署逻辑。
+- `-EnableAiUi` 现在会优先从运行中的 `2.0.6` 客户端抓取真实 `/main.js`，再做哈希校验与 AI UI 注入。
+
+### 改进
+- `patches/ai-ui-compat.json` 已补充 `2.0.6` 兼容签名。
+- 新增 [implementation_plan.md](/G:/GEMINI-xiangmu/AGY/AGY-汉化/implementation_plan.md)，记录 `2.0.6` 的实施状态与标准部署方式。
+- README、安装说明、开发交接文档已统一切换到 `2.0.6` 口径。

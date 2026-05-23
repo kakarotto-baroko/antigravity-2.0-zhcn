@@ -3,8 +3,7 @@
 ## 系统要求
 
 - Windows 10/11 64-bit
-- Antigravity 2.0.0 已安装
-- Antigravity 2.0.1 当前需要手动核对安装结构
+- Antigravity 2.0.6 已安装
 - PowerShell 5.1+
 
 ## 自动安装
@@ -35,25 +34,21 @@ AI 面板模式只把 `https://127.0.0.1:<port>/main.js` 重定向到本地 `agy
 
 ## 版本现状
 
-- `2.0.0`:
-  当前脚本链路可以正常应用核心汉化和 AI UI 汉化。
-- `2.0.1`:
-  本机自动更新后，安装目录结构已变化，`scripts/apply.ps1` 仍会按旧路径 `resources/app/out/nls.messages.json` 检查安装，导致误报未安装。
-  AI UI 注入已在本机手动重新挂回，但一键安装脚本仍需继续适配。
+- `2.0.6`:
+  当前脚本已兼容。它会优先从运行中的 Antigravity 会话抓取真实 `/main.js`，保存为本地缓存并校验哈希，命中后再启用 AI UI 汉化。
+- 核心 VS Code 部分:
+  由于 `2.0.6` 已不再沿用旧的 `resources/app/out` 结构，脚本会跳过不适用的旧路径注入，避免误改。
 
 ## 手动安装
 
-### 1. 备份原始文件
+### 1. 关闭 Antigravity
+
+为释放 `app.asar` 文件锁，应用汉化前必须先彻底退出客户端。
+
+### 2. 运行脚本
 
 ```powershell
-$agyPath = "$env:LOCALAPPDATA\Programs\Antigravity\resources\app\out"
-Copy-Item "$agyPath\nls.messages.json" "$agyPath\nls.messages.json.bak"
-```
-
-### 2. 替换翻译文件
-
-```powershell
-Copy-Item "translations\nls.messages.zh-CN.json" "$agyPath\nls.messages.json"
+powershell -ExecutionPolicy Bypass -File scripts/apply.ps1 -EnableAiUi
 ```
 
 ### 3. 重启 Antigravity
@@ -76,12 +71,10 @@ Copy-Item "$agyPath\nls.messages.json.bak" "$agyPath\nls.messages.json"
 ## 故障排除
 
 ### 应用后界面显示异常
-- 确认 Antigravity 版本为 2.0.0
-- 检查 `version.json` 中的版本号是否匹配
-- 尝试恢复英文后重新应用
-- 若卡在进入界面，请先运行默认安装命令，不要加 `-EnableAiUi`
-- 若主界面仍是英文，请关闭 Antigravity 后重新运行 `scripts/apply.ps1 -EnableAiUi`，再确认日志中出现 `Serving translated AI UI bundle`
-- 若已升级到 `2.0.1`，请优先参考 [HANDOFF.md](/G:/GEMINI-xiangmu/AGY/AGY-汉化/docs/HANDOFF.md) 中的结构差异说明，不要直接假设 `2.0.0` 的安装路径仍然存在
+- 确认 Antigravity 版本为 `2.0.6`
+- 尝试关闭客户端后重新运行 `scripts/apply.ps1 -EnableAiUi`
+- 若主界面仍是英文，请确认主日志中出现 `Serving translated AI UI bundle`
+- 版本与哈希状态以 [implementation_plan.md](/G:/GEMINI-xiangmu/AGY/AGY-汉化/implementation_plan.md) 为准
 
 ### Antigravity 更新后如何适配
 
