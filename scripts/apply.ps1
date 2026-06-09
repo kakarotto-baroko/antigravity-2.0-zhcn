@@ -20,7 +20,7 @@ param(
     [switch]$EnableAiUi,
     [switch]$NoProcessPrompt,
     [string]$AntigravityPath = "$env:LOCALAPPDATA\Programs\Antigravity",
-    [string]$UiMainSource = "$env:USERPROFILE\.gemini\antigravity\brain\a12d81c7-05e0-4def-b7bc-6e8543fed692\scratch\ui_main.js"
+    [string]$UiMainSource = "$PSScriptRoot\..\main.js"
 )
 
 $ErrorActionPreference = "Stop"
@@ -196,7 +196,7 @@ function Invoke-AsarPack {
         Remove-Item $tmpAsar -Force
     }
 
-    npx asar pack $SourceDir $tmpAsar
+    asar pack $SourceDir $tmpAsar
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $tmpAsar)) {
         throw "Failed to pack app.asar."
     }
@@ -219,7 +219,7 @@ function Set-CustomSchemeMode {
             Write-Host "  Created backup of app.asar" -ForegroundColor Green
         }
         Write-Host "  Extracting app.asar..." -ForegroundColor White
-        npx asar extract $asarPath $extractedPath
+        asar extract $asarPath $extractedPath
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path $extractedPath)) {
             throw "Failed to extract app.asar."
         }
@@ -409,7 +409,7 @@ if ($EnableAiUi) {
     $aiCompat = Test-AiUiCompatibility
     if ($aiCompat.compatible) {
         Write-Host "  AI UI compatibility check passed." -ForegroundColor Green
-        python "$ProjectRoot\scripts\translate_ui.py" --input "$UiMainSource"
+        node "$ProjectRoot\scripts\translate_ui.js" --input "$UiMainSource"
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to generate AI UI translation bundle."
         }

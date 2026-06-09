@@ -1,0 +1,10 @@
+﻿{
+    "aiUiCompatibilityReason":  "matched supported bundle",
+    "nlsSha256":  null,
+    "appAsarSha256":  "44953E545FD27F9AEEA7CA834F6EAEE8B7BC9C032207AD92D55D13F7ABF25A0F",
+    "aiUiSourceSha256":  "0BAC1D5A550E9D9E4422E71D915DE0ACA1802E0FAE70848790FDD7BD9235A74F",
+    "reason":  "AI UI bundle matched compatibility manifest",
+    "mode":  "ai-ui-enabled",
+    "antigravityVersion":  "2.0.11",
+    "writtenAt":  "2026-06-09T16:27:43+08:00"
+}

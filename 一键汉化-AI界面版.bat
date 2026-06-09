@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 cd /d "%~dp0"
 title Antigravity 一键汉化 - AI界面版
 echo.
